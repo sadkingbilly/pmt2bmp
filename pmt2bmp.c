@@ -253,7 +253,7 @@ uint8_t *convert_group_to_bmp(uint8_t *pmt_group_start, uint8_t *bmp_group_start
     return bmp_ptr;
 }
 
-// Convert data from PMT file to BMP data.
+/* Convert data from PMT file to BMP data. */
 uint8_t *pmt_to_bmp(char *pmt_file_name, uint8_t *bmp_buf) {
     uint8_t raw_group_buf[PMT_DECODED_GROUP_BYTES];
     uint8_t decoded_group_buf[PMT_DECODED_GROUP_BYTES];

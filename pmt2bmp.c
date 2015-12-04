@@ -15,6 +15,11 @@
     (840 bits, 1 bit per pixel) for one of the VGA planes. In order to reconstruct the
     4-bit color value for each pixel, the pixel's bit value from each of the blocks/planes
     needs to be combined into a 4-bit integer (see bmp_pixel()).
+
+    The pixel information is followed by a 64-byte footer. The last 48 bytes of the footer
+    contain the color table represented as 16 3-byte entries of 6-bit R/G/B color values.
+    The color of each pixel is determined by a lookup of the decoded pixel value into this
+    table.
 */
 
 
@@ -54,6 +59,8 @@
 
 typedef uint8_t pmt_row_t[PMT_PLANES][PMT_DECODED_ROW_PLANE_BYTES];
 
+typedef uint8_t pmt_color_table_t[16][3];
+
 typedef uint8_t bmp_color_table_t[16][4];
 
 typedef struct {
@@ -76,6 +83,8 @@ typedef struct {
     uint32_t colors;
     uint32_t important_colors;
 } bmp_info_header_t;
+
+typedef uint8_t vga_palette_t[256][3];
 
 #pragma pack(pop)
 
@@ -105,27 +114,6 @@ const bmp_info_header_t bmp_info_header = {
     (1 << PMT_PLANES),
     0
 };
-
-/* 16-color VGA palette, each row contains a null-terminated R, G, B values. */
-const bmp_color_table_t bmp_color_table = {
-    {0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0xAA, 0x00},
-    {0x00, 0xAA, 0x00, 0x00},
-    {0x00, 0xAA, 0xAA, 0x00},
-    {0xAA, 0x00, 0x00, 0x00},
-    {0xAA, 0x00, 0xAA, 0x00},
-    {0xAA, 0x55, 0x00, 0x00},
-    {0xAA, 0xAA, 0xAA, 0x00},
-    {0x55, 0x55, 0x55, 0x00},
-    {0x55, 0x55, 0xFF, 0x00},
-    {0x55, 0xFF, 0x55, 0x00},
-    {0x55, 0xFF, 0xFF, 0x00},
-    {0xFF, 0x55, 0x55, 0x00},
-    {0xFF, 0x55, 0xFF, 0x00},
-    {0xFF, 0xFF, 0x55, 0x00},
-    {0xFF, 0xFF, 0xFF, 0x00}
-};
-
 
 /* Read PMT raw byte group data into a buffer. */
 int pmt_read_group(FILE *fh, uint8_t *buf, int buf_size) {
@@ -253,8 +241,21 @@ uint8_t *convert_group_to_bmp(uint8_t *pmt_group_start, uint8_t *bmp_group_start
     return bmp_ptr;
 }
 
+/* Convert PMT color table to BMP color table. */
+void pmt_to_bmp_color_table(pmt_color_table_t *pmt_color_table,
+                            bmp_color_table_t *bmp_color_table) {
+    for (int i = 0; i < 16; i++) {
+        for (int c = 0; c < 3; c++) {
+            /* PMT color table contains 6-bit R/G/B values, BMP color table expects */
+            /* 8-bit B/G/R values with a terminating zero byte.                     */
+            (*bmp_color_table)[i][c] = (*pmt_color_table)[i][2-c] << 2;
+        }
+        (*bmp_color_table)[i][3] = 0;
+    }
+}
+
 /* Convert data from PMT file to BMP data. */
-uint8_t *pmt_to_bmp(char *pmt_file_name, uint8_t *bmp_buf) {
+uint8_t *pmt_to_bmp(char *pmt_file_name, uint8_t *bmp_buf, bmp_color_table_t *bmp_color_table) {
     uint8_t raw_group_buf[PMT_DECODED_GROUP_BYTES];
     uint8_t decoded_group_buf[PMT_DECODED_GROUP_BYTES];
     uint8_t *end_ptr;
@@ -281,6 +282,17 @@ uint8_t *pmt_to_bmp(char *pmt_file_name, uint8_t *bmp_buf) {
         end_ptr = convert_group_to_bmp(decoded_group_buf, bmp_buf + i * BMP_GROUP_BYTES);
     }
 
+    pmt_color_table_t pmt_color_table;
+    /* Skip 16 bytes of the footer to get to the raw color table. */
+    fseek(in, 16, SEEK_CUR);
+    /* Table of 16 colors, each specified as three 6-bit R/G/B values. */
+    int color_table_bytes_read = fread(&pmt_color_table, 1, sizeof(pmt_color_table_t), in);
+    if (color_table_bytes_read != sizeof(pmt_color_table_t)) {
+        printf("ERROR: unexpected color table bytes read (%d)\n", color_table_bytes_read);
+        return NULL;
+    }
+    pmt_to_bmp_color_table(&pmt_color_table, bmp_color_table);
+
     return end_ptr;
 }
 
@@ -288,6 +300,7 @@ uint8_t *pmt_to_bmp(char *pmt_file_name, uint8_t *bmp_buf) {
 int main(int argc, char **argv) {
 
     uint8_t bmp_pixel_array[BMP_PIXEL_ARRAY_SIZE];
+    bmp_color_table_t bmp_color_table;
 
     if (argc < 3) {
         printf("ERROR: insufficient arguments.\n");
@@ -295,7 +308,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    uint8_t *out_ptr = pmt_to_bmp(argv[1], bmp_pixel_array);
+    uint8_t *out_ptr = pmt_to_bmp(argv[1], bmp_pixel_array, &bmp_color_table);
     if ((out_ptr - bmp_pixel_array) != BMP_PIXEL_ARRAY_SIZE) {
         printf("ERROR: unexpected number of bytes in pixel array.\n");
         return 1;

@@ -112,7 +112,7 @@ const bmp_info_header_t bmp_info_header = {
     0,
     0,
     0,
-    (1 << PMT_PLANES),
+    PMT_COLORS,
     0
 };
 

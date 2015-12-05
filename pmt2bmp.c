@@ -84,8 +84,6 @@ typedef struct {
     uint32_t important_colors;
 } bmp_info_header_t;
 
-typedef uint8_t vga_palette_t[256][3];
-
 #pragma pack(pop)
 
 

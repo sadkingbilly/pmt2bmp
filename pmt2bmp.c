@@ -31,6 +31,9 @@
 /* Number of VGA planes, same as number of bits per pixel. */
 #define PMT_PLANES 4
 
+/* Number of colors. */
+#define PMT_COLORS (1 << PMT_PLANES)
+
 /* Complete pixel row size, for all planes. */
 #define PMT_DECODED_ROW_BYTES (PMT_DECODED_ROW_PLANE_BYTES * PMT_PLANES)
 
@@ -59,9 +62,9 @@
 
 typedef uint8_t pmt_row_t[PMT_PLANES][PMT_DECODED_ROW_PLANE_BYTES];
 
-typedef uint8_t pmt_color_table_t[16][3];
+typedef uint8_t pmt_color_table_t[PMT_COLORS][3];
 
-typedef uint8_t bmp_color_table_t[16][4];
+typedef uint8_t bmp_color_table_t[PMT_COLORS][4];
 
 typedef struct {
     uint8_t magic[2];
@@ -242,7 +245,7 @@ uint8_t *convert_group_to_bmp(uint8_t *pmt_group_start, uint8_t *bmp_group_start
 /* Convert PMT color table to BMP color table. */
 void pmt_to_bmp_color_table(pmt_color_table_t *pmt_color_table,
                             bmp_color_table_t *bmp_color_table) {
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < PMT_COLORS; i++) {
         for (int c = 0; c < 3; c++) {
             /* PMT color table contains 6-bit R/G/B values, BMP color table expects */
             /* 8-bit B/G/R values with a terminating zero byte.                     */

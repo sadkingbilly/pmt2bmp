@@ -310,6 +310,10 @@ int main(int argc, char **argv) {
     }
 
     uint8_t *out_ptr = pmt_to_bmp(argv[1], bmp_pixel_array, &bmp_color_table);
+    if (!out_ptr) {
+        printf("ERROR: conversion failed.\n");
+        return 1;
+    }
     if ((out_ptr - bmp_pixel_array) != BMP_PIXEL_ARRAY_SIZE) {
         printf("ERROR: unexpected number of bytes in pixel array.\n");
         return 1;
